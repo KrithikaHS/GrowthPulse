@@ -1,49 +1,55 @@
-import axios from "axios";
+// frontend/src/components/UploadSales.js
 import { useState } from "react";
 
-function UploadSales({ onUploadSuccess }) {  // ✅ add { onUploadSuccess }
+export default function UploadSales({ onKPIUpdate }) {
   const [file, setFile] = useState(null);
-  const [message, setMessage] = useState("");
-  const handleClear = async () => {
-  try {
-    await axios.delete("http://127.0.0.1:8000/api/clear-sales/");
-    setMessage("✅ All sales data cleared");
-    if (onUploadSuccess) onUploadSuccess(); // refresh charts after clearing
-  } catch (err) {
-    setMessage(`❌ Clear failed: ${err.response?.data?.message || err.message}`);
-  }
-};
+  const [uploading, setUploading] = useState(false);
+
+  const handleFileChange = (e) => {
+    setFile(e.target.files[0]);
+  };
+
   const handleUpload = async () => {
     if (!file) {
-      setMessage("Please select a file first.");
+      alert("Please select a file");
       return;
     }
+
+    setUploading(true);
 
     const formData = new FormData();
     formData.append("file", file);
 
     try {
-      const res = await axios.post("http://127.0.0.1:8000/api/upload-sales/", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+      const res = await fetch("http://localhost:8000/api/upload-sales/", {
+        method: "POST",
+        body: formData,
       });
-      setMessage(`✅ Upload successful: ${res.data.rows_added} rows added`);
 
-      if (onUploadSuccess) onUploadSuccess(); // ✅ call parent refresh
-    } catch (err) {
-      setMessage(`❌ Upload failed: ${err.response?.data?.message || err.message}`);
+      const data = await res.json();
+
+      if (res.ok) {
+        alert("✅ " + data.message);
+        if (data.kpi_summary) {
+          onKPIUpdate(data.kpi_summary);
+        }
+      } else {
+        alert("❌ " + (data.error || "Upload failed"));
+      }
+    } catch (error) {
+      console.error(error);
+      alert("❌ Upload failed");
+    } finally {
+      setUploading(false);
     }
   };
 
   return (
-    <div style={{ marginBottom: "20px" }}>
-      <input type="file" onChange={(e) => setFile(e.target.files[0])} />
-      <button onClick={handleUpload}>Upload</button>
-      <p>{message}</p>
-      <button onClick={handleClear} style={{ marginLeft: "10px", backgroundColor: "red", color: "white" }}>
-      Clear Data
-    </button>
+    <div>
+      <input type="file" accept=".csv,.xls,.xlsx" onChange={handleFileChange} />
+      <button onClick={handleUpload} disabled={uploading}>
+        {uploading ? "Uploading..." : "Upload"}
+      </button>
     </div>
   );
 }
-
-export default UploadSales;

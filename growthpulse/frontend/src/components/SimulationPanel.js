@@ -1,76 +1,76 @@
-import axios from "axios";
-import { useEffect, useState } from "react";
-import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+// src/components/SimulationPanel.js
+import { useState } from "react";
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-function SimulationPanel() {
-  const [factorsConfig, setFactorsConfig] = useState({});
-  const [formValues, setFormValues] = useState({});
-  const [forecastData, setForecastData] = useState([]);
+export default function SimulationPanel() {
+  const [growthRate, setGrowthRate] = useState(5); // %
+  const [months, setMonths] = useState(6);
+  const [data, setData] = useState([]);
 
-  useEffect(() => {
-    axios.get("http://127.0.0.1:8000/api/simulation-factors/")
-      .then(res => {
-        setFactorsConfig(res.data);
-        // Initialize default values
-        const defaults = {};
-        Object.entries(res.data).forEach(([key, cfg]) => {
-          defaults[key] = cfg.type === "slider" ? 0 : "No Change";
-        });
-        setFormValues(defaults);
-      })
-      .catch(err => console.error(err));
-  }, []);
-
-  const runSimulation = () => {
-    axios.post("http://127.0.0.1:8000/api/forecast-sales-simulation/", formValues)
-      .then(res => setForecastData(res.data))
-      .catch(err => console.error(err));
-  };
-
-  const handleChange = (key, value) => {
-    setFormValues(prev => ({ ...prev, [key]: value }));
+  const runSimulation = async () => {
+    try {
+      const res = await fetch("http://127.0.0.1:8000/api/simulate-sales/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          growth_rate: growthRate / 100, // Convert % to decimal
+          months: months
+        }),
+      });
+      const result = await res.json();
+      setData(result);
+    } catch (err) {
+      console.error("Simulation error:", err);
+    }
   };
 
   return (
-    <div style={{ marginTop: "30px" }}>
-      <h2>🔮 What‑If Simulation</h2>
+    <div>
+      <div style={{ marginBottom: "20px" }}>
+        <label>
+          Growth Rate (%):{" "}
+          <input
+            type="number"
+            value={growthRate}
+            onChange={(e) => setGrowthRate(Number(e.target.value))}
+            style={{ width: "80px" }}
+          />
+        </label>
+        <label style={{ marginLeft: "20px" }}>
+          Forecast Months:{" "}
+          <input
+            type="number"
+            value={months}
+            onChange={(e) => setMonths(Number(e.target.value))}
+            style={{ width: "80px" }}
+          />
+        </label>
+        <button
+          onClick={runSimulation}
+          style={{
+            marginLeft: "20px",
+            padding: "5px 10px",
+            background: "blue",
+            color: "white",
+            border: "none",
+            borderRadius: "5px"
+          }}
+        >
+          Run Simulation
+        </button>
+      </div>
 
-      {Object.entries(factorsConfig).map(([key, cfg]) => (
-        <div key={key} style={{ marginBottom: "15px" }}>
-          <label>{cfg.label}: </label>
-          {cfg.type === "slider" ? (
-            <>
-              <input
-                type="range"
-                min={cfg.min}
-                max={cfg.max}
-                value={formValues[key]}
-                onChange={(e) => handleChange(key, Number(e.target.value))}
-              />
-              <span>{formValues[key]}%</span>
-            </>
-          ) : cfg.type === "dropdown" ? (
-            <select value={formValues[key]} onChange={(e) => handleChange(key, e.target.value)}>
-              {cfg.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-            </select>
-          ) : null}
-        </div>
-      ))}
-
-      <button onClick={runSimulation} style={{ marginTop: "10px" }}>Run Simulation</button>
-
-      <ResponsiveContainer width="100%" height={300}>
-        <LineChart data={forecastData}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="date" />
-          <YAxis />
-          <Tooltip />
-          <Legend />
-          <Line type="monotone" dataKey="predicted_sales" stroke="#ff7300" />
-        </LineChart>
-      </ResponsiveContainer>
+      {data.length > 0 && (
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="month" />
+            <YAxis />
+            <Tooltip />
+            <Line type="monotone" dataKey="sales" stroke="#ff7300" />
+          </LineChart>
+        </ResponsiveContainer>
+      )}
     </div>
   );
 }
-
-export default SimulationPanel;

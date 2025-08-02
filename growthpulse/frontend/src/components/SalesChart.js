@@ -1,39 +1,31 @@
-import axios from "axios";
+// src/components/SalesChart.js
 import { useEffect, useState } from "react";
-import {
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis, YAxis
-} from "recharts";
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-function SalesChart({ refresh }) {  // ✅ add { refresh }
-  const [salesData, setSalesData] = useState([]);
+export default function SalesChart({ refreshTrigger }) {
+  const [data, setData] = useState([]);
 
   useEffect(() => {
-    axios.get("http://127.0.0.1:8000/api/sales-data/")
-      .then(res => setSalesData(res.data))
-      .catch(err => console.error(err));
-  }, [refresh]); // ✅ re-fetch when refresh changes
-
+  fetch("http://localhost:8000/api/sales-data/")
+    .then(res => res.json())
+    .then(data => {
+      if (Array.isArray(data) && data.length > 0) {
+        setData(data);
+      } else {
+        setData([]);
+      }
+    })
+    .catch(() => setData([]));
+}, []);
   return (
-    <div style={{ margin: "20px" }}>
-      <h2>📈 Sales Trends</h2>
-      <ResponsiveContainer width="100%" height={400}>
-        <LineChart data={salesData}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="date" />
-          <YAxis />
-          <Tooltip />
-          <Legend />
-          <Line type="monotone" dataKey="units_sold" stroke="#8884d8" name="Units Sold" />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
+    <ResponsiveContainer width="100%" height={300}>
+      <LineChart data={data}>
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis dataKey="month" />
+        <YAxis />
+        <Tooltip />
+        <Line type="monotone" dataKey="sales" stroke="#8884d8" />
+      </LineChart>
+    </ResponsiveContainer>
   );
 }
-
-export default SalesChart;
