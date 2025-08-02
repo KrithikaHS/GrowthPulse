@@ -1,0 +1,40 @@
+{
+  "price_change": {
+    "label": "Price Change (%)",
+    "type": "slider",
+    "min": -50,
+    "max": 50,
+    "effect": -1.0
+  },
+  "tax_change": {
+    "label": "Tax Change (%)",
+    "type": "slider",
+    "min": -50,
+    "max": 50,
+    "effect": -0.5
+  },
+  "marketing_spend_change": {
+    "label": "Marketing Spend Change (%)",
+    "type": "slider",
+    "min": -50,
+    "max": 50,
+    "effect": 1.2
+  },
+  "competitor_price_change": {
+    "label": "Competitor Price Change (%)",
+    "type": "slider",
+    "min": -50,
+    "max": 50,
+    "effect": 0.8
+  },
+  "design_change": {
+    "label": "Design Change",
+    "type": "dropdown",
+    "options": ["No Change", "UtoV", "VtoU"],
+    "effects": {
+      "UtoV": 0.05,
+      "VtoU": -0.05,
+      "No Change": 0
+    }
+  }
+}

@@ -1,0 +1,9 @@
+product_name,date,units_sold,price,tax_rate,design_type
+Product A,2024-01-01,120,10.5,5,U
+Product B,2024-01-05,90,8.0,5,V
+Product A,2024-01-10,150,11.0,5,U
+Product B,2024-01-15,130,8.5,5,V
+Product A,2024-01-20,170,10.8,5,U
+Product B,2024-01-25,160,8.2,5,V
+Product A,2024-02-01,180,11.2,5,U
+Product B,2024-02-05,140,8.1,5,V
