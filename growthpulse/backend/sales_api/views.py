@@ -9,6 +9,8 @@ from rest_framework import status
 from .mongo_connection import sales_collection
 import re,traceback
 from prophet import Prophet
+import numpy as np
+
 
 
 
@@ -172,59 +174,70 @@ class ForecastSalesView(APIView):
         try:
             # Fetch data from MongoDB
             data = list(sales_collection.find({}, {"_id": 0}))
-            
             if not data:
-                return Response({"error": "No sales data found"}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "No sales data available"}, status=status.HTTP_400_BAD_REQUEST)
 
             df = pd.DataFrame(data)
 
-            # Normalize column names
+            # Standardize column names
             df.columns = [c.strip().lower() for c in df.columns]
 
-            # Try to find month and sales columns
-            month_col = next((c for c in df.columns if "month" in c or "mon" in c), None)
-            sales_col = next((c for c in df.columns if "sales" in c), None)
+            # Ensure correct columns
+            if 'month' not in df.columns or 'sales' not in df.columns:
+                return Response({"error": "CSV must have 'month' and 'sales' columns"}, status=status.HTTP_400_BAD_REQUEST)
 
-            if not month_col or not sales_col:
-                return Response({"error": "Missing month or sales column"}, status=status.HTTP_400_BAD_REQUEST)
+            # Parse dates
+            df['month'] = pd.to_datetime(df['month'], errors='coerce')
+            df = df.dropna(subset=['month', 'sales'])
+            df = df.sort_values(by='month')
 
-            # Rename for Prophet
-            df = df.rename(columns={month_col: "ds", sales_col: "y"})
+            # Prepare Prophet data
+            prophet_df = df.rename(columns={'month': 'ds', 'sales': 'y'})
 
-            # Convert month column to datetime
-            df["ds"] = pd.to_datetime(df["ds"], errors="coerce", infer_datetime_format=True)
-
-            # If still NaT, try month names without year
-            if df["ds"].isna().any():
-                try:
-                    df["ds"] = pd.to_datetime(df["ds"].astype(str) + " " + str(pd.Timestamp.today().year),
-                                              errors="coerce", infer_datetime_format=True)
-                except:
-                    pass
-
-            # Drop invalid rows
-            df = df.dropna(subset=["ds", "y"])
-            df["y"] = pd.to_numeric(df["y"], errors="coerce")
-            df = df.dropna(subset=["y"])
-
-            if len(df) < 2:
-                return Response({"error": "Not enough valid data for forecasting"}, status=status.HTTP_400_BAD_REQUEST)
-
-            # Train Prophet model
+            # Forecast with Prophet
             model = Prophet()
-            model.fit(df)
+            model.fit(prophet_df)
 
-            # Forecast for 6 months ahead
-            future = model.make_future_dataframe(periods=6, freq="M")
+            future = model.make_future_dataframe(periods=6, freq='M')
             forecast = model.predict(future)
 
-            # Format response
-            forecast_df = forecast[["ds", "yhat"]].tail(6)
-            result = [{"month": str(row["ds"].date()), "forecast": round(row["yhat"], 2)}
-                      for _, row in forecast_df.iterrows()]
+            # Historical + Forecast separation
+            historical_data = df.to_dict(orient='records')
 
-            return Response(result, status=status.HTTP_200_OK)
+            forecast_data = forecast[['ds', 'yhat']].tail(6)
+            forecast_data = forecast_data.rename(columns={'ds': 'month', 'yhat': 'forecast'})
+            forecast_data['month'] = forecast_data['month'].dt.strftime('%Y-%m-%d')
+            forecast_list = forecast_data.to_dict(orient='records')
+
+            # KPI calculations
+            this_month_sales = df.iloc[-1]['sales']
+            last_month_sales = df.iloc[-2]['sales'] if len(df) > 1 else this_month_sales
+            mom_growth = ((this_month_sales - last_month_sales) / last_month_sales * 100) if last_month_sales != 0 else 0
+
+            # YoY growth
+            yoy_growth = None
+            if len(df) > 12:
+                last_year_sales = df.iloc[-13]['sales']
+                yoy_growth = ((this_month_sales - last_year_sales) / last_year_sales * 100) if last_year_sales != 0 else 0
+
+            # Anomaly detection (2 std deviation rule)
+            mean_sales = df['sales'].mean()
+            std_sales = df['sales'].std()
+            anomalies = df[(df['sales'] > mean_sales + 2 * std_sales) | (df['sales'] < mean_sales - 2 * std_sales)]
+            anomalies_list = anomalies[['month', 'sales']].to_dict(orient='records')
+
+            # Prepare final response
+            return Response({
+                "historical": historical_data,
+                "forecast": forecast_list,
+                "kpi": {
+                    "this_month": round(this_month_sales, 2),
+                    "last_month": round(last_month_sales, 2),
+                    "mom_growth": round(mom_growth, 2),
+                    "yoy_growth": round(yoy_growth, 2) if yoy_growth is not None else None
+                },
+                "anomalies": anomalies_list
+            }, status=status.HTTP_200_OK)
 
         except Exception as e:
-            traceback.print_exc()
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
