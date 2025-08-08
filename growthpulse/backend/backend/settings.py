@@ -40,9 +40,13 @@ INSTALLED_APPS = [
 
     'rest_framework',
     'sales_api',
+    'corsheaders',
+
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
+
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -53,7 +57,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'backend.urls'
-
+CORS_ALLOW_ALL_ORIGINS = True 
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -125,6 +129,3 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 MIDDLEWARE.insert(0, "corsheaders.middleware.CorsMiddleware")
-
-CORS_ALLOW_ALL_ORIGINS = True
-INSTALLED_APPS += ['corsheaders']

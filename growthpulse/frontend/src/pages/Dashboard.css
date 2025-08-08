@@ -1,0 +1,36 @@
+.dashboard {
+  padding: 20px;
+}
+
+.upload-section {
+  margin-bottom: 20px;
+}
+
+.kpi-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.kpi-card {
+  background: white;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+}
+
+.anomalies-section {
+  margin-top: 20px;
+}
+
+.anomalies-section table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.anomalies-section th,
+.anomalies-section td {
+  padding: 8px;
+  border: 1px solid #ccc;
+}

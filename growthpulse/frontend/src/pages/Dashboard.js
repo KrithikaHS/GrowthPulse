@@ -1,212 +1,147 @@
-// import ForecastChart from "../components/ForecastChart";
-// import SalesChart from "../components/SalesChart";
-// import SimulationPanel from "../components/SimulationPanel";
-// import UploadSales from "../components/UploadSales";
-// // src/components/DashboardChart.js
-// import axios from "axios";
-// import { useEffect, useState } from "react";
-// import {
-//   CartesianGrid,
-//   Legend,
-//   Line,
-//   LineChart,
-//   ReferenceDot,
-//   ResponsiveContainer,
-//   Tooltip,
-//   XAxis,
-//   YAxis,
-// } from "recharts";
-
-// export default function Dashboard() {
-
-//   const [data, setData] = useState([]);
-//   const [kpi, setKpi] = useState({});
-//   const [anomalies, setAnomalies] = useState([]);
-
-//   useEffect(() => {
-//     axios
-//       .get("http://localhost:8000/api/forecast-sales/")
-//       .then((res) => {
-//         console.log("Forecast API Response:", res.data);
-
-//         const historical = res.data.historical.map((d) => ({
-//           month: d.month,
-//           sales: d.sales,
-//         }));
-
-//         const forecast = res.data.forecast.map((d) => ({
-//           month: d.month,
-//           forecast: d.forecast,
-//         }));
-
-//         // Merge historical + forecast
-//         const merged = [...historical, ...forecast];
-
-//         setData(merged);
-//         setKpi(res.data.kpi);
-//         setAnomalies(res.data.anomalies || []);
-//       })
-//       .catch((err) => {
-//         console.error("Error fetching forecast data", err);
-//       });
-//   }, []);
-  
-//   return (
-//     <div>
-//       {/* Upload Sales Data */}
-//       <section style={{ marginBottom: "40px" }}>
-//         <h2>Upload Sales Data</h2>
-//         <UploadSales />
-//       </section>
-
-//       {/* Sales Overview */}
-//       <section style={{ marginBottom: "40px" }}>
-//         <h2>Sales Overview</h2>
-//         <div style={{ width: "100%", height: 400 }}>
-//           <SalesChart />
-//         </div>
-//       </section>
-
-//       {/* Forecast Chart */}
-//       <section style={{ marginBottom: "40px" }}>
-//         <h2>Sales Forecast</h2>
-//         <div style={{ width: "100%", height: 400 }}>
-//           <ForecastChart />
-//         </div>
-//       </section>
-
-//       {/* Simulation Panel */}
-//       <section>
-//         <h2>Sales Simulation</h2>
-//         <SimulationPanel />
-//       </section>
-//     <div style={{ padding: "20px" }}>
-//       <h2 style={{ textAlign: "center" }}>📊 Sales Overview & Forecast</h2>
-
-//       {/* KPI Cards */}
-//       <div style={{ display: "flex", justifyContent: "space-around", marginBottom: "20px" }}>
-//         <div style={cardStyle}>
-//           <h3>This Month</h3>
-//           <p style={{ fontSize: "20px", fontWeight: "bold" }}>{kpi.this_month}</p>
-//         </div>
-//         <div style={cardStyle}>
-//           <h3>MoM Growth</h3>
-//           <p style={{ fontSize: "20px", fontWeight: "bold", color: kpi.mom_growth >= 0 ? "green" : "red" }}>
-//             {kpi.mom_growth}%
-//           </p>
-//         </div>
-//         <div style={cardStyle}>
-//           <h3>YoY Growth</h3>
-//           <p style={{ fontSize: "20px", fontWeight: "bold", color: kpi.yoy_growth >= 0 ? "green" : "red" }}>
-//             {kpi.yoy_growth !== null ? `${kpi.yoy_growth}%` : "N/A"}
-//           </p>
-//         </div>
-//       </div>
-
-//       {/* Combined Chart */}
-//       <ResponsiveContainer width="100%" height={400}>
-//         <LineChart data={data}>
-//           <CartesianGrid stroke="#ccc" strokeDasharray="5 5" />
-//           <XAxis dataKey="month" />
-//           <YAxis />
-//           <Tooltip />
-//           <Legend />
-
-//           {/* Historical Line */}
-//           <Line type="monotone" dataKey="sales" stroke="#8884d8" name="Historical Sales" />
-
-//           {/* Forecast Line */}
-//           <Line type="monotone" dataKey="forecast" stroke="#82ca9d" name="Forecast" strokeDasharray="5 5" />
-
-//           {/* Anomaly Points */}
-//           {anomalies.map((a, index) => (
-//             <ReferenceDot
-//               key={index}
-//               x={a.month}
-//               y={a.sales}
-//               r={6}
-//               fill="red"
-//               stroke="none"
-//               label={{ value: "⚠", position: "top" }}
-//             />
-//           ))}
-//         </LineChart>
-//       </ResponsiveContainer>
-//     </div>
-//     </div>
-//   );
-// }
-// const cardStyle = {
-//   padding: "10px",
-//   background: "white",
-//   borderRadius: "8px",
-//   boxShadow: "0 2px 5px rgba(0,0,0,0.1)",
-//   textAlign: "center",
-//   flex: "1",
-//   margin: "0 10px",
-// };
-// frontend/src/pages/Dashboard.js
 // src/pages/Dashboard.js
-import axios from "axios";
 import { useEffect, useState } from "react";
-import DashboardChart from "../components/DashboardChart";
-import KPICards from "../components/KPICards";
+import { clearSalesData, fetchForecastData, runSimulation, uploadSalesFile } from "../api";
+import Chart from "../components/SalesChart";
 import SimulationPanel from "../components/SimulationPanel";
-import UploadSales from "../components/UploadSales";
+import "./Dashboard.css";
 
 export default function Dashboard() {
-  const [data, setData] = useState([]);
-  const [kpi, setKpi] = useState({});
-  const [anomalies, setAnomalies] = useState([]);
+  const [forecastData, setForecastData] = useState(null);
+  const [kpi, setKpi] = useState(null);
+  const [file, setFile] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetchData();
+    loadAllData();
   }, []);
 
-  const fetchData = () => {
-    axios
-      .get("http://localhost:8000/api/forecast-sales/")
-      .then((res) => {
-        const historical = res.data.historical.map((d) => ({
-          month: d.month,
-          sales: d.sales,
-        }));
+  const loadAllData = async () => {
+    try {
+      const forecast = await fetchForecastData();
+      setForecastData(forecast);
+      if (forecast && forecast.kpi) {
+        setKpi(forecast.kpi);
+      }
+    } catch (err) {
+      console.error("Error loading data:", err);
+    }
+  };
 
-        const forecast = res.data.forecast.map((d) => ({
-          month: d.month,
-          forecast: d.forecast,
-        }));
+  const handleFileChange = (e) => {
+    setFile(e.target.files[0]);
+  };
 
-        setData([...historical, ...forecast]);
-        setKpi(res.data.kpi);
-        setAnomalies(res.data.anomalies || []);
-      })
-      .catch((err) => console.error("Error fetching forecast data", err));
+  const handleUpload = async () => {
+    if (!file) return alert("Please select a file");
+    setLoading(true);
+    try {
+      await uploadSalesFile(file);
+      await loadAllData();
+    } catch (err) {
+      console.error("Upload failed", err);
+    }
+    setLoading(false);
   };
 
   return (
-    <div>
-      <h1 style={{ textAlign: "center" }}>📈 GrowthPulse Analytics</h1>
+    <div className="dashboard">
+      {/* Upload Section */}
+      <div className="upload-section">
+        <h3>Upload Sales Data</h3>
+        <input type="file" onChange={handleFileChange} />
+        <button onClick={handleUpload} disabled={loading}>
+          {loading ? "Uploading..." : "Upload"}
+        </button>
+        <button
+          onClick={async () => {
+            if (window.confirm("Are you sure you want to clear all sales data?")) {
+              await clearSalesData();
+              setForecastData(null);
+              setKpi(null);
+            }
+          }}
+        >
+          Clear Data
+        </button>
+      </div>
 
-      <section style={{ marginBottom: "40px" }}>
-        <h2>Upload Sales Data</h2>
-        <UploadSales onUploadComplete={fetchData} />
-      </section>
+      {/* KPI Section */}
+      {kpi && (
+        <div className="kpi-container">
+          <div className="kpi-card"><strong>Total Sales:</strong> {kpi.total_sales ?? "-"}</div>
+          <div className="kpi-card"><strong>Average Sales:</strong> {kpi.average_sales ?? "-"}</div>
+          <div className="kpi-card"><strong>Median Sales:</strong> {kpi.median_sales ?? "-"}</div>
+          <div className="kpi-card"><strong>Sales Variance:</strong> {kpi.variance_sales ?? "-"}</div>
+          <div className="kpi-card"><strong>Std. Dev.:</strong> {kpi.std_dev_sales ?? "-"}</div>
+          <div className="kpi-card"><strong>Rolling 3-Month Avg:</strong> {kpi.rolling_3m_avg_last ?? "-"}</div>
+          <div className="kpi-card">
+            <strong>Best Month:</strong>{" "}
+            {kpi.best_month ? `${kpi.best_month} (${kpi.best_month_sales})` : "-"}
+          </div>
+          <div className="kpi-card">
+            <strong>Worst Month:</strong>{" "}
+            {kpi.worst_month ? `${kpi.worst_month} (${kpi.worst_month_sales})` : "-"}
+          </div>
+          <div className="kpi-card"><strong>Growth %:</strong> {kpi.growth_percentage ?? "-"}</div>
+          {kpi.yoy_growth !== null && kpi.yoy_growth !== undefined && (
+            <div className="kpi-card"><strong>YoY Growth %:</strong> {kpi.yoy_growth}</div>
+          )}
+          {kpi.target_vs_actual_percentage && (
+            <div className="kpi-card"><strong>Target vs Actual:</strong> {kpi.target_vs_actual_percentage}%</div>
+          )}
+          {kpi.customer_acquisition_cost && (
+            <div className="kpi-card"><strong>CAC:</strong> {kpi.customer_acquisition_cost}</div>
+          )}
+        </div>
+      )}
 
-      <section style={{ marginBottom: "40px" }}>
-        <h2>KPI Summary</h2>
-        <KPICards kpi={kpi} />
-      </section>
+      {/* Chart */}
 
-      <section style={{ marginBottom: "40px" }}>
-        <h2>Sales Overview + Forecast</h2>
-        <DashboardChart data={data} anomalies={anomalies} />
-      </section>
+      {forecastData && (
+        
+<Chart
+  historical={forecastData.historical}
+  forecast={forecastData.forecast}
+  moving_average={forecastData.moving_average}
 
-      <section>
-        <h2>What-if Simulation</h2>
-        <SimulationPanel />
-      </section>
+  trend={forecastData.trend}
+  seasonality={forecastData.seasonality}
+  yoy_comparison={forecastData.yoy_comparison}
+
+/>
+      )}
+
+      {/* Anomalies */}
+      {forecastData?.anomalies?.length > 0 && (
+        <div className="anomalies-section">
+          <h3>Detected Anomalies</h3>
+          <table>
+            <thead>
+              <tr><th>Month</th><th>Sales</th></tr>
+            </thead>
+            <tbody>
+              {forecastData.anomalies.map((a, i) => (
+                <tr key={i}>
+                  <td>{new Date(a.month).toLocaleDateString()}</td>
+                  <td>{a.sales}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Simulation */}
+<SimulationPanel
+  onSimulation={async (payload) => {
+    const res = await runSimulation(payload); // updated API
+    await loadAllData();
+    return res;
+  }}
+/>
+
+
+
     </div>
   );
 }

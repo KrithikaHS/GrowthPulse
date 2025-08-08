@@ -1,127 +1,96 @@
-// // src/components/SimulationPanel.js
-// import { useState } from "react";
-// import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-
-// export default function SimulationPanel() {
-//   const [growthRate, setGrowthRate] = useState(5); // %
-//   const [months, setMonths] = useState(6);
-//   const [data, setData] = useState([]);
-
-//   const runSimulation = async () => {
-//     try {
-//       const res = await fetch("http://127.0.0.1:8000/api/simulate-sales/", {
-//         method: "POST",
-//         headers: { "Content-Type": "application/json" },
-//         body: JSON.stringify({
-//           growth_rate: growthRate / 100, // Convert % to decimal
-//           months: months
-//         }),
-//       });
-//       const result = await res.json();
-//       setData(result);
-//     } catch (err) {
-//       console.error("Simulation error:", err);
-//     }
-//   };
-
-//   return (
-//     <div>
-//       <div style={{ marginBottom: "20px" }}>
-//         <label>
-//           Growth Rate (%):{" "}
-//           <input
-//             type="number"
-//             value={growthRate}
-//             onChange={(e) => setGrowthRate(Number(e.target.value))}
-//             style={{ width: "80px" }}
-//           />
-//         </label>
-//         <label style={{ marginLeft: "20px" }}>
-//           Forecast Months:{" "}
-//           <input
-//             type="number"
-//             value={months}
-//             onChange={(e) => setMonths(Number(e.target.value))}
-//             style={{ width: "80px" }}
-//           />
-//         </label>
-//         <button
-//           onClick={runSimulation}
-//           style={{
-//             marginLeft: "20px",
-//             padding: "5px 10px",
-//             background: "blue",
-//             color: "white",
-//             border: "none",
-//             borderRadius: "5px"
-//           }}
-//         >
-//           Run Simulation
-//         </button>
-//       </div>
-
-//       {data.length > 0 && (
-//         <ResponsiveContainer width="100%" height={300}>
-//           <LineChart data={data}>
-//             <CartesianGrid strokeDasharray="3 3" />
-//             <XAxis dataKey="month" />
-//             <YAxis />
-//             <Tooltip />
-//             <Line type="monotone" dataKey="sales" stroke="#ff7300" />
-//           </LineChart>
-//         </ResponsiveContainer>
-//       )}
-//     </div>
-//   );
-// }
-// src/components/SimulationPanel.js
-import axios from "axios";
 import { useState } from "react";
+import "../styles/SimulationPanel.css";
 
-export default function SimulationPanel() {
+export default function SimulationPanel({ onSimulation }) {
+  const [scenario, setScenario] = useState("base");
   const [growthRate, setGrowthRate] = useState(0.05);
+  const [priceChange, setPriceChange] = useState(0);
   const [months, setMonths] = useState(6);
+  const [campaigns, setCampaigns] = useState([]);
   const [results, setResults] = useState([]);
 
-  const runSimulation = () => {
-    axios
-      .post("http://localhost:8000/api/simulate-sales/", {
-        growth_rate: growthRate,
-        months: months,
-      })
-      .then((res) => setResults(res.data))
-      .catch((err) => console.error("Simulation error", err));
+  const handleSimulate = async () => {
+    try {
+      const payload = { scenario };
+
+      if (scenario === "custom") {
+        payload.growth_rate = growthRate;
+        payload.price_change = priceChange;
+        payload.months = months;
+        payload.campaigns = campaigns;
+      }
+
+      const data = await onSimulation(payload);
+      setResults(data.results || []);
+    } catch (err) {
+      console.error("Simulation failed", err);
+    }
+  };
+
+  const addCampaign = () => {
+    setCampaigns([...campaigns, { name: "", start_month: "", end_month: "", lift: 0 }]);
+  };
+
+  const updateCampaign = (index, field, value) => {
+    const updated = [...campaigns];
+    updated[index][field] = value;
+    setCampaigns(updated);
   };
 
   return (
-    <div>
-      <label>Growth Rate (%): </label>
-      <input
-        type="number"
-        step="0.01"
-        value={growthRate}
-        onChange={(e) => setGrowthRate(parseFloat(e.target.value))}
-      />
+    <div className="simulation-panel">
+      <h3>What-if Simulation</h3>
 
-      <label style={{ marginLeft: "10px" }}>Months: </label>
-      <input
-        type="number"
-        value={months}
-        onChange={(e) => setMonths(parseInt(e.target.value))}
-      />
+      <label>Scenario:</label>
+      <select value={scenario} onChange={(e) => setScenario(e.target.value)}>
+        <option value="base">Base Case</option>
+        <option value="best">Best Case</option>
+        <option value="worst">Worst Case</option>
+        <option value="custom">Custom</option>
+      </select>
 
-      <button onClick={runSimulation} style={{ marginLeft: "10px" }}>
-        Run Simulation
-      </button>
+      {scenario === "custom" && (
+        <>
+          <label>Growth Rate (% per month):</label>
+          <input type="number" step="0.01" value={growthRate}
+            onChange={(e) => setGrowthRate(parseFloat(e.target.value) || 0)} />
+
+          <label>Price Change (%):</label>
+          <input type="number" step="0.01" value={priceChange}
+            onChange={(e) => setPriceChange(parseFloat(e.target.value) || 0)} />
+
+          <label>Months Ahead:</label>
+          <input type="number" value={months}
+            onChange={(e) => setMonths(parseInt(e.target.value) || 0)} />
+
+          <h4>Campaigns</h4>
+          {campaigns.map((camp, idx) => (
+            <div key={idx} className="campaign-row">
+              <input placeholder="Name" value={camp.name}
+                onChange={(e) => updateCampaign(idx, "name", e.target.value)} />
+              <input type="month" value={camp.start_month}
+                onChange={(e) => updateCampaign(idx, "start_month", e.target.value)} />
+              <input type="month" value={camp.end_month}
+                onChange={(e) => updateCampaign(idx, "end_month", e.target.value)} />
+              <input type="number" step="0.01" placeholder="Lift %"
+                value={camp.lift} onChange={(e) => updateCampaign(idx, "lift", e.target.value)} />
+            </div>
+          ))}
+          <button onClick={addCampaign}>+ Add Campaign</button>
+        </>
+      )}
+
+      <button onClick={handleSimulate}>Simulate</button>
 
       {results.length > 0 && (
-        <ul style={{ marginTop: "10px" }}>
-          {results.map((r, idx) => (
-            <li key={idx}>
-              {r.month}: {r.sales}
-            </li>
-          ))}
-        </ul>
+        <div className="simulation-results">
+          <h4>Simulation Results</h4>
+          <ul>
+            {results.map((item, idx) => (
+              <li key={idx}>{item.month}: {item.sales}</li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );

@@ -1,0 +1,17 @@
+.anomalies-container {
+  margin-top: 1rem;
+}
+
+.anomalies-container table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.anomalies-container th, .anomalies-container td {
+  border: 1px solid #ddd;
+  padding: 8px;
+}
+
+.anomalies-container th {
+  background: #f2f2f2;
+}
